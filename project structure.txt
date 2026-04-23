@@ -1,0 +1,12 @@
+health_analytics_system/
+├── python/
+│   ├── data_processor.py
+│   ├── analytics_engine.py
+│   ├── visualization.py
+│   ├── models.py
+│   └── main.py
+├── java_integration/
+│   └── DataValidator.java (optional Java component)
+├── data/
+│   └── sample_health_data.csv
+└── requirements.txt
