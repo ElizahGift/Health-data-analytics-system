@@ -8,3 +8,4 @@ sqlalchemy==2.0.19
 faker==19.2.0
 flask==2.3.3
 jpype1==1.4.1
+scipy==1.11.1
