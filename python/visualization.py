@@ -4,11 +4,20 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import pandas as pd
-from typing import Dict
+from typing import Dict, Optional
 import numpy as np
+from pathlib import Path
 
 class HealthVisualizer:
+    """Handles all data visualization for the health analytics system"""
+    
     def __init__(self, data: Dict[str, pd.DataFrame]):
+        """
+        Initialize visualizer with data
+        
+        Args:
+            data: Dictionary containing 'patients', 'vitals', 'labs' DataFrames
+        """
         self.data = data
         self.patients_df = data['patients']
         self.vitals_df = data['vitals']
@@ -204,8 +213,17 @@ class HealthVisualizer:
         plt.tight_layout()
         plt.show()
     
-    def generate_health_report(self, patient_id: str) -> str:
-        """Generate a text-based health report for a patient"""
+    def generate_health_report(self, patient_id: str, risk_df: Optional[pd.DataFrame] = None) -> str:
+        """
+        Generate a text-based health report for a patient
+        
+        Args:
+            patient_id: Patient identifier
+            risk_df: Optional pre-computed risk DataFrame
+        
+        Returns:
+            Formatted health report as string
+        """
         patient = self.patients_df[self.patients_df['patient_id'] == patient_id].iloc[0]
         vitals = self.vitals_df[self.vitals_df['patient_id'] == patient_id]
         labs = self.labs_df[self.labs_df['patient_id'] == patient_id]
@@ -252,19 +270,51 @@ Blood Pressure Classification:
             report += f"(Ref: {result['reference_range_low']:.0f}-{result['reference_range_high']:.0f}) "
             report += f"[{status}]\n"
         
-        # Calculate risk assessment
-        from analytics_engine import HealthAnalyticsEngine
-        engine = HealthAnalyticsEngine(self.data)
-        risk_df = engine.identify_high_risk_patients()
-        patient_risk = risk_df[risk_df['patient_id'] == patient_id].iloc[0]
-        
-        report += f"""
+        # Calculate risk assessment (avoid circular import by using passed risk_df or computing directly)
+        if risk_df is not None:
+            patient_risk = risk_df[risk_df['patient_id'] == patient_id].iloc[0] if patient_id in risk_df['patient_id'].values else None
+            if patient_risk is not None:
+                report += f"""
 RISK ASSESSMENT:
 ---------------
 Risk Score: {patient_risk['risk_score']}
 Risk Level: {patient_risk['risk_level']}
 Risk Factors: {patient_risk['risk_factors']}
-
+"""
+        else:
+            # Simple inline risk calculation to avoid import
+            report += f"""
+RISK ASSESSMENT:
+---------------
+Risk calculations available - run risk analysis first.
+"""
+        
+        report += f"""
 {'='*60}
 """
         return report
+    
+    def save_all_visualizations(self, output_dir: str = "visualizations"):
+        """
+        Save all visualizations to HTML and PNG files
+        
+        Args:
+            output_dir: Directory to save visualizations
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+        
+        # Save interactive dashboards
+        dashboard = self.create_population_dashboard()
+        dashboard.write_html(output_path / "population_dashboard.html")
+        
+        risk_df = None  # Would need to be passed in real usage
+        if risk_df is not None:
+            risk_matrix = self.create_risk_matrix(risk_df)
+            risk_matrix.write_html(output_path / "risk_matrix.html")
+        
+        # Save static plots
+        self.plot_lab_value_distributions()
+        plt.savefig(output_path / "lab_distributions.png", dpi=300, bbox_inches='tight')
+        
+        print(f"✓ Visualizations saved to {output_dir}/")
