@@ -5,8 +5,27 @@ from faker import Faker
 import random
 from typing import Dict, List
 from models import Patient, VitalSigns, LabResult
+from pathlib import Path
 
 class HealthDataProcessor:
+    """Handles data generation, processing, and cleaning for health analytics"""
+    
+    # Constants for data generation
+    AGE_MIN = 18
+    AGE_MAX = 85
+    DAYS_OF_VITALS = 30
+    NORMAL_HEART_RATE_MEAN = 72
+    NORMAL_HEART_RATE_STD = 10
+    
+    # Lab test definitions: (name, reference_low, reference_high, unit)
+    LAB_TESTS = [
+        ('Glucose', 70, 100, 'mg/dL'),
+        ('Cholesterol', 125, 200, 'mg/dL'),
+        ('HDL', 40, 60, 'mg/dL'),
+        ('LDL', 0, 130, 'mg/dL'),
+        ('Hemoglobin', 12, 16, 'g/dL')
+    ]
+    
     def __init__(self):
         self.fake = Faker()
         self.patients = []
@@ -28,7 +47,7 @@ class HealthDataProcessor:
             patient_id = f"P{str(i+1).zfill(4)}"
             
             # Generate patient demographics
-            age = random.randint(18, 85)
+            age = random.randint(self.AGE_MIN, self.AGE_MAX)
             gender = random.choice(['M', 'F'])
             blood_type = random.choice(blood_types)
             
@@ -60,70 +79,70 @@ class HealthDataProcessor:
             )
             self.patients.append(patient)
             
-            # Generate vital signs for the last 30 days
-            for day in range(30):
-                timestamp = datetime.now() - timedelta(days=30-day)
-                
-                # Vitals with realistic variations
-                heart_rate = int(np.random.normal(72, 10))
-                heart_rate = max(50, min(120, heart_rate))
-                
-                # Blood pressure affected by age and conditions
-                bp_baseline = 110 if age < 40 else 125
-                if 'Hypertension' in conditions:
-                    bp_baseline += 20
-                systolic = int(np.random.normal(bp_baseline, 15))
-                diastolic = int(np.random.normal(75, 10))
-                
-                temperature = np.random.normal(36.8, 0.5)
-                temperature = round(max(35.5, min(39.0, temperature)), 1)
-                
-                oxygen_sat = int(np.random.normal(98, 2))
-                oxygen_sat = max(90, min(100, oxygen_sat))
-                
-                resp_rate = int(np.random.normal(16, 3))
-                resp_rate = max(10, min(25, resp_rate))
-                
-                vital = VitalSigns(
-                    patient_id=patient_id,
-                    timestamp=timestamp,
-                    heart_rate=heart_rate,
-                    systolic_bp=systolic,
-                    diastolic_bp=diastolic,
-                    temperature=temperature,
-                    oxygen_saturation=oxygen_sat,
-                    respiratory_rate=resp_rate
-                )
-                self.vital_signs.append(vital)
+            # Generate vital signs for the last N days
+            self._generate_vital_signs_for_patient(patient, self.DAYS_OF_VITALS)
             
             # Generate lab results
-            lab_tests = [
-                ('Glucose', 70, 100, 'mg/dL'),
-                ('Cholesterol', 125, 200, 'mg/dL'),
-                ('HDL', 40, 60, 'mg/dL'),
-                ('LDL', 0, 130, 'mg/dL'),
-                ('Hemoglobin', 12, 16, 'g/dL')
-            ]
-            
-            for test_name, low, high, unit in lab_tests:
-                if test_name == 'Glucose' and 'Diabetes Type 2' in conditions:
-                    result = np.random.normal(140, 30)
-                else:
-                    result = np.random.normal((low + high) / 2, (high - low) / 6)
-                
-                lab = LabResult(
-                    patient_id=patient_id,
-                    test_date=datetime.now() - timedelta(days=random.randint(1, 90)),
-                    test_name=test_name,
-                    result_value=round(result, 1),
-                    unit=unit,
-                    reference_range_low=low,
-                    reference_range_high=high
-                )
-                self.lab_results.append(lab)
+            self._generate_lab_results_for_patient(patient)
         
         print("Data generation complete!")
-        
+    
+    def _generate_vital_signs_for_patient(self, patient: Patient, num_days: int):
+        """Generate vital signs for a single patient over specified days"""
+        for day in range(num_days):
+            timestamp = datetime.now() - timedelta(days=num_days-day)
+            
+            # Vitals with realistic variations
+            heart_rate = int(np.random.normal(self.NORMAL_HEART_RATE_MEAN, self.NORMAL_HEART_RATE_STD))
+            heart_rate = max(50, min(120, heart_rate))
+            
+            # Blood pressure affected by age and conditions
+            bp_baseline = 110 if patient.age < 40 else 125
+            if 'Hypertension' in patient.medical_conditions:
+                bp_baseline += 20
+            systolic = int(np.random.normal(bp_baseline, 15))
+            diastolic = int(np.random.normal(75, 10))
+            
+            temperature = np.random.normal(36.8, 0.5)
+            temperature = round(max(35.5, min(39.0, temperature)), 1)
+            
+            oxygen_sat = int(np.random.normal(98, 2))
+            oxygen_sat = max(90, min(100, oxygen_sat))
+            
+            resp_rate = int(np.random.normal(16, 3))
+            resp_rate = max(10, min(25, resp_rate))
+            
+            vital = VitalSigns(
+                patient_id=patient.patient_id,
+                timestamp=timestamp,
+                heart_rate=heart_rate,
+                systolic_bp=systolic,
+                diastolic_bp=diastolic,
+                temperature=temperature,
+                oxygen_saturation=oxygen_sat,
+                respiratory_rate=resp_rate
+            )
+            self.vital_signs.append(vital)
+    
+    def _generate_lab_results_for_patient(self, patient: Patient):
+        """Generate lab results for a single patient"""
+        for test_name, low, high, unit in self.LAB_TESTS:
+            if test_name == 'Glucose' and 'Diabetes Type 2' in patient.medical_conditions:
+                result = np.random.normal(140, 30)
+            else:
+                result = np.random.normal((low + high) / 2, (high - low) / 6)
+            
+            lab = LabResult(
+                patient_id=patient.patient_id,
+                test_date=datetime.now() - timedelta(days=random.randint(1, 90)),
+                test_name=test_name,
+                result_value=round(result, 1),
+                unit=unit,
+                reference_range_low=low,
+                reference_range_high=high
+            )
+            self.lab_results.append(lab)
+    
     def process_data(self) -> Dict[str, pd.DataFrame]:
         """Convert data to DataFrames for analysis"""
         patients_df = pd.DataFrame([{
@@ -173,13 +192,31 @@ class HealthDataProcessor:
         for key in dfs:
             dfs[key] = dfs[key].drop_duplicates()
         
-        # Handle missing values
-        dfs['vitals'] = dfs['vitals'].fillna(dfs['vitals'].mean(numeric_only=True))
+        # Handle missing values - use median instead of mean for robustness
+        dfs['vitals'] = dfs['vitals'].fillna(dfs['vitals'].median(numeric_only=True))
         
-        # Filter outliers
+        # Filter outliers using IQR method
         vitals = dfs['vitals']
-        vitals = vitals[vitals['heart_rate'].between(40, 200)]
-        vitals = vitals[vitals['oxygen_saturation'].between(70, 100)]
+        for col in ['heart_rate', 'oxygen_saturation']:
+            Q1 = vitals[col].quantile(0.25)
+            Q3 = vitals[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            vitals = vitals[vitals[col].between(lower_bound, upper_bound)]
+        
         dfs['vitals'] = vitals
         
         return dfs
+    
+    def save_raw_data(self, output_dir: str = "raw_data"):
+        """Save generated raw data to CSV files"""
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+        
+        # Convert to DataFrames and save
+        data = self.process_data()
+        for name, df in data.items():
+            df.to_csv(output_path / f"{name}.csv", index=False)
+        
+        print(f"Raw data saved to {output_dir}/")
